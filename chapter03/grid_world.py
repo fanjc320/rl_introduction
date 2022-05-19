@@ -11,6 +11,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.table import Table
 
+# Matplotlib is a plotting library. It relies on some backend to actually render the plots.
+# The default backend is the agg backend. This backend only renders PNGs. 
+# On Jupyter notebooks the matplotlib backends are special as they are rendered to the browser.
 matplotlib.use('Agg')
 
 WORLD_SIZE = 5

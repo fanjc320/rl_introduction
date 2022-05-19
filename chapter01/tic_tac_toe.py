@@ -66,7 +66,7 @@ class State:
                 self.end = True
                 return self.end
 
-        # whether it's a tie
+        # whether it's a tie -1或1 全部落满棋盘，总和是9
         sum_values = np.sum(np.abs(self.data))
         if sum_values == BOARD_SIZE:
             self.winner = 0
@@ -79,9 +79,9 @@ class State:
 
     # @symbol: 1 or -1
     # put chessman symbol in position (i, j)
-    def next_state(self, i, j, symbol):
+    def new_next_state(self, i, j, symbol):
         new_state = State()
-        new_state.data = np.copy(self.data)
+        new_state.data = np.copy(self.data) # [i,j] ->1/-1
         new_state.data[i, j] = symbol
         return new_state
 
@@ -101,18 +101,19 @@ class State:
             print(out)
         print('-------------')
 
-
 def get_all_states_impl(current_state, current_symbol, all_states):
     for i in range(BOARD_ROWS):
         for j in range(BOARD_COLS):
             if current_state.data[i][j] == 0:
-                new_state = current_state.next_state(i, j, current_symbol)
+                new_state = current_state.new_next_state(i, j, current_symbol)
                 new_hash = new_state.hash()
                 if new_hash not in all_states:
                     is_end = new_state.is_end()
                     all_states[new_hash] = (new_state, is_end)
                     if not is_end:
                         get_all_states_impl(new_state, -current_symbol, all_states)
+                    else:
+                        print("all_states:", all_states)    
 
 
 def get_all_states():
@@ -145,6 +146,7 @@ class Judger:
         self.p1.reset()
         self.p2.reset()
 
+# 带yield的函数是一个生成器，而不是一个函数了，这个生成器有一个函数就是next函数，next就相当于“下一步”生成哪个数，这一次的next开始的地方是接着上一次的next停止的地方执行的
     def alternate(self):
         while True:
             yield self.p1
@@ -160,10 +162,13 @@ class Judger:
         if print_state:
             current_state.print_state()
         while True:
-            player = next(alternator)
+# next(iterator[, default])
+# Retrieve the next item from the iterator by calling its __next__() method. 
+# If default is given, it is returned if the iterator is exhausted, otherwise StopIteration is raised.
+            player = next(alternator) # 和yield配对
             i, j, symbol = player.act()
-            next_state_hash = current_state.next_state(i, j, symbol).hash()
-            current_state, is_end = all_states[next_state_hash]
+            next_state_hash = current_state.new_next_state(i, j, symbol).hash()
+            current_state, is_end = all_states[next_state_hash] # all_states 存储了整个下棋过程
             self.p1.set_state(current_state)
             self.p2.set_state(current_state)
             if print_state:
@@ -192,9 +197,12 @@ class Player:
         self.states.append(state)
         self.greedy.append(True)
 
+
+# self.estimations self.states 都是hash为key的，棋盘上的每一种状态对应一种hash
     def set_symbol(self, symbol):
         self.symbol = symbol
-        for hash_val in all_states:
+        # for key in a_dict:
+        for hash_val in all_states: #5478 个元素, 
             state, is_end = all_states[hash_val]
             if is_end:
                 if state.winner == self.symbol:
@@ -209,14 +217,20 @@ class Player:
 
     # update value estimation
     def backup(self):
-        states = [state.hash() for state in self.states]
+        states = [state.hash() for state in self.states] # self.states 0-7 :
 
         for i in reversed(range(len(states) - 1)):
             state = states[i]
-            td_error = self.greedy[i] * (
-                self.estimations[states[i + 1]] - self.estimations[state]
+            next_state = states[i + 1]
+            estimate = self.estimations[state]
+            next_estimate = self.estimations[next_state]
+            greedy = self.greedy[i] # greedy 才计算estimate????
+            td_error = greedy * (
+                next_estimate - estimate 
             )
             self.estimations[state] += self.step_size * td_error
+        
+        # logger.info(self.estimations)
 
     # choose an action based on the state
     def act(self):
@@ -227,7 +241,7 @@ class Player:
             for j in range(BOARD_COLS):
                 if state.data[i, j] == 0:
                     next_positions.append([i, j])
-                    next_states.append(state.next_state(
+                    next_states.append(state.new_next_state(
                         i, j, self.symbol).hash())
 
         if np.random.rand() < self.epsilon:
@@ -238,9 +252,15 @@ class Player:
 
         values = []
         for hash_val, pos in zip(next_states, next_positions):
-            values.append((self.estimations[hash_val], pos))
+            hs = self.estimations[hash_val]
+            values.append((hs, pos))
+            # values.append((self.estimations[hash_val], pos))
         # to select one of the actions of equal value at random due to Python's sort is stable
         np.random.shuffle(values)
+# 1、max(num, key=lambda x:x[0])语法介绍如下：
+# key=lambda 元素: 元素[字段索引]
+# print(max(C, key=lambda x: x[0]))  
+# x:x[]字母可以随意修改，求最大值方式按照中括号[]里面的维度，[0]按照第一维，[1]按照第二维。
         values.sort(key=lambda x: x[0], reverse=True)
         action = values[0][1]
         action.append(self.symbol)
@@ -253,6 +273,7 @@ class Player:
     def load_policy(self):
         with open('policy_%s.bin' % ('first' if self.symbol == 1 else 'second'), 'rb') as f:
             self.estimations = pickle.load(f)
+        # print("self.estimations:", self.estimations)
 
 
 # human interface
@@ -262,7 +283,7 @@ class Player:
 # | z | x | c |
 class HumanPlayer:
     def __init__(self, **kwargs):
-        self.symbol = None
+        self.symbol = None #player1 1 player2 -1
         self.keys = ['q', 'w', 'e', 'a', 's', 'd', 'z', 'x', 'c']
         self.state = None
 
@@ -278,7 +299,7 @@ class HumanPlayer:
     def act(self):
         self.state.print_state()
         key = input("Input your position:")
-        data = self.keys.index(key)
+        data = self.keys.index(key) # 0-8
         i = data // BOARD_COLS
         j = data % BOARD_COLS
         return i, j, self.symbol
@@ -291,7 +312,7 @@ def train(epochs, print_every_n=500):
     player1_win = 0.0
     player2_win = 0.0
     for i in range(1, epochs + 1):
-        winner = judger.play(print_state=False)
+        winner = judger.play(print_state=True)
         if winner == 1:
             player1_win += 1
         if winner == -1:
@@ -339,8 +360,11 @@ def play():
         else:
             print("It is a tie!")
 
-
+# self.estimations states 都是hash为key的，棋盘上的每一种状态对应一种hash
+# self.data是0-8
 if __name__ == '__main__':
+    #1e5 is a number expressed using scientific notation and it means 10 to the 5th power (the e meaning 'exponent')
+    #so 1e5 is equal to 100000, both notations are interchangeably meaning the same.
     train(int(1e5))
     compete(int(1e3))
     play()
