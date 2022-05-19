@@ -109,9 +109,10 @@ class Bandit:
 
         if self.sample_averages:
             # update estimation using sample averages
-            if fjc:
-                self.q_estimation_fjc[action] += (self.all_reward[action]) / self.action_count[action]
+            if fjc: # 更占用计算资源, 从表现看，效果更好???理论上不应该是一样的吗????
+                self.q_estimation_fjc[action] = (self.all_reward[action]) / self.action_count[action]
             else:
+                # Incremental Implementation
                 self.q_estimation[action] += (reward - self.q_estimation[action]) / self.action_count[action]
         elif self.gradient:
             one_hot = np.zeros(self.k)
@@ -123,9 +124,24 @@ class Bandit:
             self.q_estimation += self.step_size * (reward - baseline) * (one_hot - self.action_prob)
         else:
             # update estimation with constant step size
-            self.q_estimation[action] += self.step_size * (reward - self.q_estimation[action])
-        # logger.info("--------------------------------fjc:",fjc)
+            # self.q_estimation[action] += self.step_size * (reward - self.q_estimation[action])
+
+            # # fjc: 推导过程
+            # old_estima = self.q_estimation[action]
+            # new_estima = old_estima + (reward - self.q_estimation[action]) / self.action_count[action]
+            # self.q_estimation[action] = new_estima
+            # # =>
+            # self.q_estimation[action] = self.q_estimation[action] + (reward - self.q_estimation[action]) / self.action_count[action]
+            # # =>
+            # self.q_estimation[action] += (reward- self.q_estimation[action])/ self.action_count[action]
+            # # => 
+            # self.q_estimation[action] += 1.0/self.action_count[action] * (reward- self.q_estimation[action])
+            # # =>
+            self.q_estimation[action] += self.step_size * (reward- self.q_estimation[action])
+
+        # logger.info("--------------------------------fjc:")
         # logger.info(self.q_estimation)
+        # logger.info(self.q_estimation_fjc)
         return reward
 
 
@@ -176,7 +192,7 @@ def figure_2_1():
     plt.close()
 
 
-def figure_2_2(runs=20, time=100):
+def figure_2_2(runs=100, time=1000):
     # epsilons = [0, 0.1, 0.01]
     epsilons = [0.1]
     bandits = [Bandit(epsilon=eps, sample_averages=True) for eps in epsilons]
