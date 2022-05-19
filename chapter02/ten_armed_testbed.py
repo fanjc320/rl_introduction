@@ -71,7 +71,9 @@ class Bandit:
             return np.random.choice(self.indices, p=self.action_prob)
 
         q_best = np.max(self.q_estimation)
-        return np.random.choice(np.where(self.q_estimation == q_best)[0])
+        tmp = np.where(self.q_estimation == q_best)[0]
+        res = np.random.choice(tmp)
+        return res
 
     # take an action, update estimation for this action
     def step(self, action):
@@ -116,9 +118,19 @@ def simulate(runs, time, bandits):
 
 
 def figure_2_1():
-    plt.violinplot(dataset=np.random.randn(200, 10) + np.random.randn(10))
+    plt.subplot(2, 1, 1)
+    data = np.random.randn(200, 10) + np.random.randn(10)
+    plt.violinplot(dataset=data)
+    print("dateset")
     plt.xlabel("Action")
     plt.ylabel("Reward distribution")
+    plt.legend()
+
+    plt.subplot(2, 1, 2)
+    data = np.random.randn(200, 5)
+    plt.violinplot(dataset=data)
+    plt.legend()
+
     plt.savefig('../images/figure_2_1.png')
     plt.close()
 
