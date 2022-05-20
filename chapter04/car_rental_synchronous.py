@@ -109,7 +109,7 @@ class PolicyIteration:
 
         expected_action_returns = np.zeros((MAX_CARS + 1, MAX_CARS + 1, np.size(actions)))
         cooks = dict()
-        with mp.Pool(processes=8) as p:
+        with mp.Pool(processes=self.NR_PARALLEL_PROCESSES) as p:
             for action in actions:
                 k = np.arange(MAX_CARS + 1)
                 all_states = ((i, j) for i, j in itertools.product(k, k))
@@ -201,6 +201,31 @@ class PolicyIteration:
 
 if __name__ == '__main__':
     TRUNCATE = 9
-    solver = PolicyIteration(TRUNCATE, parallel_processes=4, delta=1e-1, gamma=0.9, solve_4_5=True)
+    solver = PolicyIteration(TRUNCATE, parallel_processes=1, delta=1e-1, gamma=0.9, solve_4_5=True)
     solver.solve()
     solver.plot()
+
+
+
+# cartesian product
+#             Input : arr1 = [10, 12] 
+# arr2 = [8, 9, 10] 
+# Output : [(10, 8), (10, 9), (10, 10), (12, 8), (12, 9), (12, 10)] 
+# =================================================
+# Partial functions allow us to fix a certain number of arguments of a function and generate a new function.
+# Example:
+# from functools import partial
+  
+# # A normal function
+# def f(a, b, c, x):
+#     return 1000*a + 100*b + 10*c + x
+  
+# # A partial function that calls f with
+# # a as 3, b as 1 and c as 4.
+# g = partial(f, 3, 1, 4)
+  
+# # Calling g()
+# print(g(5))
+# Output:
+
+# 3145

@@ -12,9 +12,19 @@ import numpy as np
 from matplotlib.table import Table
 
 # Matplotlib is a plotting library. It relies on some backend to actually render the plots.
-# The default backend is the agg backend. This backend only renders PNGs. 
+# The default backend is the agg backend. This backend only renders PNGs.
 # On Jupyter notebooks the matplotlib backends are special as they are rendered to the browser.
 matplotlib.use('Agg')
+
+# logger = logging.getLogger()
+# logger.setLevel(logging.INFO)
+# file_handler = logging.FileHandler('logs.log')
+# file_handler.setLevel(logging.DEBUG)
+# # formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
+# # file_handler.setFormatter(formatter)
+# logger.addHandler(file_handler)
+# with open('logs.log', 'w'):
+#     pass
 
 WORLD_SIZE = 5
 A_POS = [0, 1]
@@ -70,10 +80,10 @@ def draw_image(image):
             val = str(val) + " (B)"
         if [i, j] == B_PRIME_POS:
             val = str(val) + " (B')"
-        
+
         tb.add_cell(i, j, width, height, text=val,
                     loc='center', facecolor='white')
-        
+
 
     # Row and column labels...
     for i in range(len(image)):
@@ -99,11 +109,14 @@ def draw_policy(optimal_values):
             next_state, _ = step([i, j], action)
             next_vals.append(optimal_values[next_state[0],next_state[1]])
 
-        best_actions=np.where(next_vals == np.max(next_vals))[0]
+        max_vals = np.max(next_vals)
+        bool_arr = (next_vals == max_vals)
+        new_vals = np.where(bool_arr)
+        best_actions=new_vals[0]
         val=''
         for ba in best_actions:
             val+=ACTIONS_FIGS[ba]
-        
+
         # add state labels
         if [i, j] == A_POS:
             val = str(val) + " (A)"
@@ -113,12 +126,13 @@ def draw_policy(optimal_values):
             val = str(val) + " (B)"
         if [i, j] == B_PRIME_POS:
             val = str(val) + " (B')"
-        
+
         tb.add_cell(i, j, width, height, text=val,
                 loc='center', facecolor='white')
 
     # Row and column labels...
-    for i in range(len(optimal_values)):
+    l_values = len(optimal_values)
+    for i in range(l_values):
         tb.add_cell(i, -1, width, height, text=i+1, loc='right',
                     edgecolor='none', facecolor='none')
         tb.add_cell(-1, i, width, height/2, text=i+1, loc='center',
@@ -126,7 +140,7 @@ def draw_policy(optimal_values):
 
     ax.add_table(tb)
 
-
+# 利用贝尔曼方程不断进行迭代，直至收敛
 def figure_3_2():
     value = np.zeros((WORLD_SIZE, WORLD_SIZE))
     while True:
@@ -145,6 +159,7 @@ def figure_3_2():
             break
         value = new_value
 
+# 直接解贝尔曼方程组（每个状态都对应一个贝尔曼方程）
 def figure_3_2_linear_system():
     '''
     Here we solve the linear system of equations to find the exact solution.
@@ -164,10 +179,15 @@ def figure_3_2_linear_system():
                 b[index_s] -= ACTION_PROB * r
 
     x = np.linalg.solve(A, b)
-    draw_image(np.round(x.reshape(WORLD_SIZE, WORLD_SIZE), decimals=2))
+    v = x.reshape(WORLD_SIZE, WORLD_SIZE)
+    rv = np.round(v, decimals=2)
+    draw_image(rv)
     plt.savefig('../images/figure_3_2_linear_system.png')
     plt.close()
 
+# 对应公式3.19，因为这个问题中每个动作 a 只对应一个确定的 s′和 r，因此上式可以简化为：
+# v∗ ( s ) = max_a [r + γ v∗ (s′) ]
+# 原文链接：https://blog.csdn.net/weixin_42437114/article/details/109432190
 def figure_3_5():
     value = np.zeros((WORLD_SIZE, WORLD_SIZE))
     while True:

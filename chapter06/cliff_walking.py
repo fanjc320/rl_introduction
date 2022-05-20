@@ -132,7 +132,7 @@ def q_learning(q_value, step_size=ALPHA):
         action = choose_action(state, q_value)
         next_state, reward = step(state, action)
         rewards += reward
-        # Q-Learning update
+        # Q-Learning update # np.max 这里是取所有action中q值最大的那个
         q_value[state[0], state[1], action] += step_size * (
                 reward + GAMMA * np.max(q_value[next_state[0], next_state[1], :]) -
                 q_value[state[0], state[1], action])

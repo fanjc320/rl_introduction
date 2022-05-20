@@ -54,7 +54,8 @@ class Bandit:
         # real reward for each action
         self.q_true = np.random.randn(self.k) + self.true_reward
         logger.info("self.q_true:")
-        self.q_true = np.array([0,-1,5,0.5])
+        # self.q_true = np.array([0,-1,5,0.5])
+        self.q_true = np.array([0,-1,1,0.5]) + self.true_reward
         logger.info(self.q_true)
         logger.info("self.q_true end")
         # estimation for each action
@@ -79,12 +80,12 @@ class Bandit:
             UCB_estimation = self.q_estimation + \
                 self.UCB_param * np.sqrt(np.log(self.time + 1) / (self.action_count + 1e-5))
             q_best = np.max(UCB_estimation)
-            return np.random.choice(np.where(UCB_estimation == q_best)[0])
+            return np.random.choice(np.where(UCB_estimation == q_best)[0]), None
 
         if self.gradient:
             exp_est = np.exp(self.q_estimation)
             self.action_prob = exp_est / np.sum(exp_est)
-            return np.random.choice(self.indices, p=self.action_prob)
+            return np.random.choice(self.indices, p=self.action_prob), None
 
         # res = 0
         # res_fjc = 0
@@ -145,7 +146,7 @@ class Bandit:
         return reward
 
 
-def simulate(runs, time, bandits):
+def simulate(runs, time, bandits, fjc = False):
     rewards = np.zeros((len(bandits), runs, time))
     rewards_fjc = np.zeros((len(bandits), runs, time))
     best_action_counts = np.zeros(rewards.shape)
@@ -155,10 +156,12 @@ def simulate(runs, time, bandits):
             bandit.reset()
             for t in range(time):
                 action,action_fjc = bandit.act()
-                reward = bandit.step(action)
-                reward_fjc = bandit.step(action_fjc,fjc=True)
+                reward = bandit.step(action) # 执行并得到奖励
                 rewards[i, r, t] = reward
-                rewards_fjc[i, r, t] = reward_fjc
+                if fjc:
+                    reward_fjc = bandit.step(action_fjc,fjc=True)
+                    rewards_fjc[i, r, t] = reward_fjc
+
                 if action == bandit.best_action:
                     best_action_counts[i, r, t] = 1
 
@@ -168,10 +171,12 @@ def simulate(runs, time, bandits):
     mean_best_action_counts = best_action_counts.mean(axis=1)
     mean_rewards = rewards.mean(axis=1)
 
-    mean_best_action_counts_fjc = best_action_counts_fjc.mean(axis=1)
-    mean_rewards_fjc = rewards_fjc.mean(axis=1)
-
-    return mean_best_action_counts, mean_rewards, mean_best_action_counts_fjc, mean_rewards_fjc
+    if fjc:   
+        mean_best_action_counts_fjc = best_action_counts_fjc.mean(axis=1)
+        mean_rewards_fjc = rewards_fjc.mean(axis=1)
+        return mean_best_action_counts, mean_rewards, mean_best_action_counts_fjc, mean_rewards_fjc
+    else:
+        return mean_best_action_counts, mean_rewards
 
 
 def figure_2_1():
@@ -196,7 +201,7 @@ def figure_2_2(runs=100, time=1000):
     # epsilons = [0, 0.1, 0.01]
     epsilons = [0.1]
     bandits = [Bandit(epsilon=eps, sample_averages=True) for eps in epsilons]
-    best_action_counts, rewards, best_action_counts_fjc, rewards_fjc = simulate(runs, time, bandits)
+    best_action_counts, rewards, best_action_counts_fjc, rewards_fjc = simulate(runs, time, bandits, fjc=True)
 
     plt.figure(figsize=(20, 20))
 
@@ -242,12 +247,12 @@ def figure_2_2(runs=100, time=1000):
     plt.savefig('../images/figure_2_2.png')
     plt.close()
 
-
-def figure_2_3(runs=2000, time=1000):
+#initial   ????
+def figure_2_3(runs=20, time=100):
     bandits = []
-    bandits.append(Bandit(epsilon=0, initial=5, step_size=0.1))
+    bandits.append(Bandit(epsilon=0, initial=5, step_size=0.1)) # 有initial为啥收敛更快????
     bandits.append(Bandit(epsilon=0.1, initial=0, step_size=0.1))
-    best_action_counts, _ = simulate(runs, time, bandits)
+    best_action_counts, _, = simulate(runs, time, bandits)
 
     plt.plot(best_action_counts[0], label='$\epsilon = 0, q = 5$')
     plt.plot(best_action_counts[1], label='$\epsilon = 0.1, q = 0$')
@@ -258,10 +263,10 @@ def figure_2_3(runs=2000, time=1000):
     plt.savefig('../images/figure_2_3.png')
     plt.close()
 
-
+# ucb      ????
 def figure_2_4(runs=2000, time=1000):
     bandits = []
-    bandits.append(Bandit(epsilon=0, UCB_param=2, sample_averages=True))
+    bandits.append(Bandit(epsilon=0, UCB_param=2, sample_averages=True)) # ucb到底是怎么回事?????
     bandits.append(Bandit(epsilon=0.1, sample_averages=True))
     _, average_rewards = simulate(runs, time, bandits)
 
@@ -274,8 +279,9 @@ def figure_2_4(runs=2000, time=1000):
     plt.savefig('../images/figure_2_4.png')
     plt.close()
 
-
-def figure_2_5(runs=2000, time=1000):
+# gradient
+# def figure_2_5(runs=2000, time=1000):
+def figure_2_5(runs=20, time=100):
     bandits = []
     bandits.append(Bandit(gradient=True, step_size=0.1, gradient_baseline=True, true_reward=4))
     bandits.append(Bandit(gradient=True, step_size=0.1, gradient_baseline=False, true_reward=4))
@@ -297,7 +303,7 @@ def figure_2_5(runs=2000, time=1000):
     plt.close()
 
 
-def figure_2_6(runs=2000, time=1000):
+def figure_2_6(runs=20, time=100):
     labels = ['epsilon-greedy', 'gradient bandit',
               'UCB', 'optimistic initialization']
     generators = [lambda epsilon: Bandit(epsilon=epsilon, sample_averages=True),
@@ -312,7 +318,8 @@ def figure_2_6(runs=2000, time=1000):
     bandits = []
     for generator, parameter in zip(generators, parameters):
         for param in parameter:
-            bandits.append(generator(pow(2, param)))
+            bandit = generator(pow(2, param))
+            bandits.append(bandit)
 
     _, average_rewards = simulate(runs, time, bandits)
     rewards = np.mean(average_rewards, axis=1)
@@ -332,8 +339,8 @@ def figure_2_6(runs=2000, time=1000):
 
 if __name__ == '__main__':
     # figure_2_1()
-    figure_2_2()
+    # figure_2_2()
     # figure_2_3()
     # figure_2_4()
     # figure_2_5()
-    # figure_2_6()
+    figure_2_6()

@@ -57,7 +57,12 @@ def poisson_probability(n, lam):
     global poisson_cache
     key = n * 10 + lam
     if key not in poisson_cache:
+        # pmf(k, mu, loc=0)
+        # Probability mass function.
+        # 泊松分布的参数λ是随机事件发生次数的数学期望值
         poisson_cache[key] = poisson.pmf(n, lam)
+    
+    print("poisson_probability:", poisson_cache)
     return poisson_cache[key]
 
 

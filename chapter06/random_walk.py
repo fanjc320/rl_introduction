@@ -16,7 +16,7 @@ from tqdm import tqdm
 # 6 is the right terminal state
 # 1 ... 5 represents A ... E
 VALUES = np.zeros(7)
-VALUES[1:6] = 0.5
+VALUES[1:6] = 0.5  # 左闭右开
 # For convenience, we assume all rewards are 0
 # and the left terminal state has value 0, the right terminal state has value 1
 # This trick has been used in Gambler's Problem
@@ -48,6 +48,7 @@ def temporal_difference(values, alpha=0.1, batch=False):
         trajectory.append(state)
         # TD update
         if not batch:
+            # 推导:values[state] = reward + values[old_state]...
             values[old_state] += alpha * (reward + values[state] - values[old_state])
         if state == 6 or state == 0:
             break
@@ -79,7 +80,9 @@ def monte_carlo(values, alpha=0.1, batch=False):
     if not batch:
         for state_ in trajectory[:-1]:
             # MC update
-            values[state_] += alpha * (returns - values[state_])
+            # values[state_] = alpha * returns + (1 - alpha) * values[state_]
+            # values[state_] = values[state_] + alpha * (returns - values[state_])
+            values[state_] += alpha * (returns - values[state_]) #????对吗 !!!!
     return trajectory, [returns] * (len(trajectory) - 1)
 
 # Example 6.2 left
@@ -96,14 +99,15 @@ def compute_state_value():
     plt.ylabel('Estimated Value')
     plt.legend()
 
-# Example 6.2 right
+# Example 6.2 right 可以看出td error比rms error 下降的更快
 def rms_error():
     # Same alpha value can appear in both arrays
     td_alphas = [0.15, 0.1, 0.05]
     mc_alphas = [0.01, 0.02, 0.03, 0.04]
     episodes = 100 + 1
     runs = 100
-    for i, alpha in enumerate(td_alphas + mc_alphas):
+    for i, alpha in enumerate(td_alphas + mc_alphas): # 加好可以这样用?????
+        print("---- i:",i, " alpha:", alpha)
         total_errors = np.zeros(episodes)
         if i < len(td_alphas):
             method = 'TD'
@@ -113,7 +117,9 @@ def rms_error():
             linestyle = 'dashdot'
         for r in tqdm(range(runs)):
             errors = []
+            old_current_values = np.copy(VALUES)
             current_values = np.copy(VALUES)
+            print("---- i:",i, " alpha:", alpha, " values change:", old_current_values==current_values)
             for i in range(0, episodes):
                 errors.append(np.sqrt(np.sum(np.power(TRUE_VALUE - current_values, 2)) / 5.0))
                 if method == 'TD':
@@ -135,14 +141,17 @@ def batch_updating(method, episodes, alpha=0.001):
     total_errors = np.zeros(episodes)
     for r in tqdm(range(0, runs)):
         current_values = np.copy(VALUES)
-        current_values[1:6] = -1
+        current_values[1:6] = -1 ### 这里不再是0了，
         errors = []
         # track shown trajectories and reward/return sequences
         trajectories = []
         rewards = []
+        # book:
+# After each new episode, all episodes seen so far were treated as a batch. They were repeatedly presented to the
+# algorithm, either TD(0) or constant-α MC
         for ep in range(episodes):
             if method == 'TD':
-                trajectory_, rewards_ = temporal_difference(current_values, batch=True)
+                trajectory_, rewards_ = temporal_difference(current_values, batch=True) # batch=True, 函数内部不更新current_values,只是为了获得轨迹和奖励
             else:
                 trajectory_, rewards_ = monte_carlo(current_values, batch=True)
             trajectories.append(trajectory_)
@@ -155,7 +164,7 @@ def batch_updating(method, episodes, alpha=0.001):
                         if method == 'TD':
                             updates[trajectory_[i]] += rewards_[i] + current_values[trajectory_[i + 1]] - current_values[trajectory_[i]]
                         else:
-                            updates[trajectory_[i]] += rewards_[i] - current_values[trajectory_[i]]
+                            updates[trajectory_[i]] += rewards_[i] - current_values[trajectory_[i]] ### 对吗????
                 updates *= alpha
                 if np.sum(np.abs(updates)) < 1e-3:
                     break

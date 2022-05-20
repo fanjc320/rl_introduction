@@ -40,7 +40,7 @@ def step(state, action):
     reward = -1
     return next_state, reward
 
-
+#https://matplotlib.org/3.5.0/api/_as_gen/matplotlib.pyplot.table.html
 def draw_image(image):
     fig, ax = plt.subplots()
     ax.set_axis_off()
@@ -54,8 +54,9 @@ def draw_image(image):
         tb.add_cell(i, j, width, height, text=val,
                     loc='center', facecolor='white')
 
+    len_img = len(image)
         # Row and column labels...
-    for i in range(len(image)):
+    for i in range(len_img):
         tb.add_cell(i, -1, width, height, text=i+1, loc='right',
                     edgecolor='none', facecolor='none')
         tb.add_cell(-1, i, width, height/2, text=i+1, loc='center',
@@ -95,7 +96,8 @@ def figure_4_1():
     # Figure 4.1 actually uses out-of-place version.
     _, asycn_iteration = compute_state_value(in_place=True)
     values, sync_iteration = compute_state_value(in_place=False)
-    draw_image(np.round(values, decimals=2))
+    roundv = np.round(values, decimals=2)
+    draw_image(roundv)
     print('In-place: {} iterations'.format(asycn_iteration))
     print('Synchronous: {} iterations'.format(sync_iteration))
 
