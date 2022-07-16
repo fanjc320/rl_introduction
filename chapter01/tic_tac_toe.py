@@ -117,16 +117,20 @@ def get_all_states_impl(current_state, current_symbol, all_states):
                 if new_hash not in all_states:
                     is_end = new_state.is_end()
                     all_states[new_hash] = (new_state, is_end)
-                    if not is_end:
+                    if not is_end:# 没结束的情况下，这个状态下仍旧可以继续往下走,之所以在这里用-current_symbol，是因为x和o的数量要一致,当然也可以不用这种方式达到目的
                         get_all_states_impl(new_state, -current_symbol, all_states)
                     else:
-                        print("all_states:", all_states)    
+                        # print("all_states:", all_states)
+                        # print("all_states====================:")
+                        # for k, v in all_states.items():
+                        #     print(k, v[0].data, v[1])
+                        pass
 
 
 def get_all_states():
     current_symbol = 1
     current_state = State()
-    all_states = dict()
+    all_states = dict()# hash state is_end
     hs = current_state.hash()
     all_states[hs] = (current_state, current_state.is_end())
     get_all_states_impl(current_state, current_symbol, all_states)
@@ -150,7 +154,7 @@ class Judger:
         self.p2.set_symbol(self.p2_symbol)
         self.current_state = State()
 
-    def reset(self):
+    def reset(self):# 每一局结束或新一局开始的时候，清空玩家历史所有状态
         self.p1.reset()
         self.p2.reset()
 
@@ -160,7 +164,7 @@ class Judger:
             yield self.p1
             yield self.p2
 
-    # @print_state: if True, print each board during the game
+    # @print_state: if True, print each board during the game 直到end,分出胜负、平局
     def play(self, print_state=False):
         alternator = self.alternate()
         self.reset()
@@ -175,9 +179,8 @@ class Judger:
 # If default is given, it is returned if the iterator is exhausted, otherwise StopIteration is raised.
             player = next(alternator) # 和yield配对 # p1和p2轮替
             i, j, symbol = player.act()
-            current_state.print_state()
-            next_state_hash = current_state.new_next_state(i, j, symbol).hash()# new出来的state保存在哪个容器了?
-            current_state, is_end = all_states[next_state_hash] # all_states 存储了整个下棋过程，包括下完和未下完的棋局
+            next_state_hash = current_state.new_next_state(i, j, symbol).hash()# new出来的state保存在哪个容器了? 早就在all_states中了
+            current_state, is_end = all_states[next_state_hash] # all_states 存储了整个下棋过程，包括下完和未下完的棋局,这里从all_states中判断是否结束
             self.p1.set_state(current_state) # 两个玩家共享一个state
             self.p2.set_state(current_state)
             if print_state:
@@ -186,7 +189,7 @@ class Judger:
                 return current_state.winner
 
 
-# AI player
+# AI player, 用于训练
 class Player:
     # @step_size: the step size to update estimations
     # @epsilon: the probability to explore
@@ -194,7 +197,7 @@ class Player:
         self.estimations = dict()
         self.step_size = step_size
         self.epsilon = epsilon
-        self.states = [] # 本局所有历史状态, 和humanplayer不同
+        self.states = [] # 本局到现在所有历史状态, 和humanplayer不同
         self.greedy = []
         self.symbol = 0
 
@@ -208,6 +211,7 @@ class Player:
 
 
 # self.estimations self.states 都是hash为key的，棋盘上的每一种状态对应一种hash
+# 根据all_states 的状态，初始化所有状态对应的value
     def set_symbol(self, symbol):
         self.symbol = symbol
         # for key in a_dict:
@@ -215,29 +219,39 @@ class Player:
             state, is_end = all_states[hash_val]
             if is_end:
                 if state.winner == self.symbol:
-                    self.estimations[hash_val] = 1.0
+                    self.estimations[hash_val] = 1.0 # 赢的状态，所以赢的概率是1
                 elif state.winner == 0:
                     # we need to distinguish between a tie and a lose 平局和失利
                     self.estimations[hash_val] = 0.5
                 else:
-                    self.estimations[hash_val] = 0
+                    self.estimations[hash_val] = 0 # 输的状态，value是 0
             else:
+#                 We set the initial
+# values of all the other states to 0.5, representing a guess that we have a 50% chance of winning.
                 self.estimations[hash_val] = 0.5
 
     # update value estimation
     def backup(self):
-        states = [state.hash() for state in self.states] # self.states 0-7 :
+        states = [state.hash() for state in self.states] # self.states 0-7 :# 所有历史状态的hash集合
 
-        for i in reversed(range(len(states) - 1)):
+        for i in reversed(range(len(states) - 1)):# 从倒数第二个状态开始
             state = states[i]
             next_state = states[i + 1]
-            estimate = self.estimations[state]
-            next_estimate = self.estimations[next_state]
-            greedy = self.greedy[i] # greedy 才计算estimate????
+            estimate = self.estimations[state] # estimations是hash->value, 这里是当前状态的估计值
+            next_estimate = self.estimations[next_state] # 下一状态的value
+            greedy = self.greedy[i] # 这里的greedy代表true或false,排除exploration??????
             td_error = greedy * (
                 next_estimate - estimate 
             )
-            self.estimations[state] += self.step_size * td_error #????
+            # More precisely, the current value of the earlier state is updated to be closer to
+# the value of the later state. This can be done by moving the earlier state’s value a fraction of the way
+# toward the value of the later state. If we let s denote the state before the greedy move, and s0 the state
+# after the move, then the update to the estimated value of s, denoted V (s), can be written as
+# V (s) ← V (s) + α[V (s0 ) − V (s)] ,
+# where α is a small positive fraction called the step-size parameter, which influences the rate of learning.
+# This update rule is an example of a temporal-difference learning method, so called because its changes
+# are based on a difference, V (s0 ) − V (s), between estimates at two different times.
+            self.estimations[state] += self.step_size * td_error #本质上是用下一状态的value来更新这一状态的value
         
         # logger.info(self.estimations)
 
@@ -248,21 +262,21 @@ class Player:
         next_positions = []
         for i in range(BOARD_ROWS):
             for j in range(BOARD_COLS):
-                if state.data[i, j] == 0:
+                if state.data[i, j] == 0:# 找到左右还没有落子的地方。
                     next_positions.append([i, j])
                     next_states.append(state.new_next_state(
                         i, j, self.symbol).hash())
 
-        if np.random.rand() < self.epsilon: # explore
+        if np.random.rand() < self.epsilon: # explore, 在没有落子的地方随机找一个地方落子
             action = next_positions[np.random.randint(len(next_positions))]
             action.append(self.symbol)
             self.greedy[-1] = False
             return action
 
         values = []
-        for hash_val, pos in zip(next_states, next_positions):
+        for hash_val, pos in zip(next_states, next_positions):# 二者长度一样,有对应关系，即此落子此位置导致了新状态
             hs = self.estimations[hash_val]
-            values.append((hs, pos))
+            values.append((hs, pos)) # 组合成状态的hash和位置
             # values.append((self.estimations[hash_val], pos))
         # to select one of the actions of equal value at random due to Python's sort is stable
         np.random.shuffle(values)
@@ -270,9 +284,9 @@ class Player:
 # key=lambda 元素: 元素[字段索引]
 # print(max(C, key=lambda x: x[0]))  
 # x:x[]字母可以随意修改，求最大值方式按照中括号[]里面的维度，[0]按照第一维，[1]按照第二维。
-        values.sort(key=lambda x: x[0], reverse=True)
-        action = values[0][1] # ?????
-        action.append(self.symbol)
+        values.sort(key=lambda x: x[0], reverse=True)# 根据value值倒序，取最大value,
+        action = values[0][1] # 取出value最大的位置
+        action.append(self.symbol) # 位置[i][j],再加落子1/-1
         return action
 
     def save_policy(self):
@@ -320,7 +334,7 @@ def train(epochs, print_every_n=500):
     judger = Judger(player1, player2)
     player1_win = 0.0
     player2_win = 0.0
-    for i in range(1, epochs + 1):
+    for i in range(1, epochs + 1):# 一个epoch对应一局棋
         winner = judger.play(print_state=True)
         if winner == 1:
             player1_win += 1
