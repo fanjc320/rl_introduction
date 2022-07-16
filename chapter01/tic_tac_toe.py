@@ -31,8 +31,10 @@ class State:
     def hash(self):
         if self.hash_val is None:
             self.hash_val = 0
+            # 有时候，无论元素在内存中的分布如何，重要的是要以特定的顺序来访问数组。所以nditer提供了一种顺序参数（order parameter ）的方法来实现这一要求。
+            # 默认情况下是order = 'K'， 就是上述的访问方式。另外有：order = 'C'和order = 'F'。不妨理解为：C是按行访问，F是按列访问。
             for i in np.nditer(self.data):
-                self.hash_val = self.hash_val * 3 + i + 1
+                self.hash_val = self.hash_val * 3 + i + 1 # ??????
         return self.hash_val
 
     # check whether a player has won the game, or it's a tie
@@ -40,19 +42,23 @@ class State:
         if self.end is not None:
             return self.end
         results = []
-        # check row
+        # check row 水平方向是否有下满三个
         for i in range(BOARD_ROWS):
+            # print("self.data:",self.data, " i:", i, " self.data[i,:] ",self.data[i, :])
             results.append(np.sum(self.data[i, :]))
-        # check columns
+        # check columns 竖直方向是否有下满三个
         for i in range(BOARD_COLS):
+            # print("self.data:",self.data, " i:", i, " self.data[:, i] ",self.data[:, i])
             results.append(np.sum(self.data[:, i]))
 
-        # check diagonals
+        # check diagonals 对角线是否下满三个
         trace = 0
         reverse_trace = 0
         for i in range(BOARD_ROWS):
             trace += self.data[i, i]
             reverse_trace += self.data[i, BOARD_ROWS - 1 - i]
+            # print("self.data:",self.data, " i:", i, " trace:", trace, " reverse_trace:", reverse_trace)
+
         results.append(trace)
         results.append(reverse_trace)
 
@@ -66,6 +72,7 @@ class State:
                 self.end = True
                 return self.end
 
+#平局
         # whether it's a tie -1或1 全部落满棋盘，总和是9
         sum_values = np.sum(np.abs(self.data))
         if sum_values == BOARD_SIZE:
@@ -79,10 +86,10 @@ class State:
 
     # @symbol: 1 or -1
     # put chessman symbol in position (i, j)
-    def new_next_state(self, i, j, symbol):
+    def new_next_state(self, i, j, symbol): # 每下一步棋，就会产生一个新的状态，在老状态的基础上更新一步,state的data也会改变
         new_state = State()
-        new_state.data = np.copy(self.data) # [i,j] ->1/-1
-        new_state.data[i, j] = symbol
+        new_state.data = np.copy(self.data)
+        new_state.data[i, j] = symbol # [i,j] ->1/-1
         return new_state
 
     # print the board
@@ -120,7 +127,8 @@ def get_all_states():
     current_symbol = 1
     current_state = State()
     all_states = dict()
-    all_states[current_state.hash()] = (current_state, current_state.is_end())
+    hs = current_state.hash()
+    all_states[hs] = (current_state, current_state.is_end())
     get_all_states_impl(current_state, current_symbol, all_states)
     return all_states
 
@@ -147,7 +155,7 @@ class Judger:
         self.p2.reset()
 
 # 带yield的函数是一个生成器，而不是一个函数了，这个生成器有一个函数就是next函数，next就相当于“下一步”生成哪个数，这一次的next开始的地方是接着上一次的next停止的地方执行的
-    def alternate(self):
+    def alternate(self): # 交换p1和p2
         while True:
             yield self.p1
             yield self.p2
@@ -165,11 +173,12 @@ class Judger:
 # next(iterator[, default])
 # Retrieve the next item from the iterator by calling its __next__() method. 
 # If default is given, it is returned if the iterator is exhausted, otherwise StopIteration is raised.
-            player = next(alternator) # 和yield配对
+            player = next(alternator) # 和yield配对 # p1和p2轮替
             i, j, symbol = player.act()
-            next_state_hash = current_state.new_next_state(i, j, symbol).hash()
-            current_state, is_end = all_states[next_state_hash] # all_states 存储了整个下棋过程
-            self.p1.set_state(current_state)
+            current_state.print_state()
+            next_state_hash = current_state.new_next_state(i, j, symbol).hash()# new出来的state保存在哪个容器了?
+            current_state, is_end = all_states[next_state_hash] # all_states 存储了整个下棋过程，包括下完和未下完的棋局
+            self.p1.set_state(current_state) # 两个玩家共享一个state
             self.p2.set_state(current_state)
             if print_state:
                 current_state.print_state()
@@ -185,7 +194,7 @@ class Player:
         self.estimations = dict()
         self.step_size = step_size
         self.epsilon = epsilon
-        self.states = []
+        self.states = [] # 本局所有历史状态, 和humanplayer不同
         self.greedy = []
         self.symbol = 0
 
@@ -208,7 +217,7 @@ class Player:
                 if state.winner == self.symbol:
                     self.estimations[hash_val] = 1.0
                 elif state.winner == 0:
-                    # we need to distinguish between a tie and a lose
+                    # we need to distinguish between a tie and a lose 平局和失利
                     self.estimations[hash_val] = 0.5
                 else:
                     self.estimations[hash_val] = 0
@@ -228,7 +237,7 @@ class Player:
             td_error = greedy * (
                 next_estimate - estimate 
             )
-            self.estimations[state] += self.step_size * td_error
+            self.estimations[state] += self.step_size * td_error #????
         
         # logger.info(self.estimations)
 
@@ -244,7 +253,7 @@ class Player:
                     next_states.append(state.new_next_state(
                         i, j, self.symbol).hash())
 
-        if np.random.rand() < self.epsilon:
+        if np.random.rand() < self.epsilon: # explore
             action = next_positions[np.random.randint(len(next_positions))]
             action.append(self.symbol)
             self.greedy[-1] = False
@@ -262,7 +271,7 @@ class Player:
 # print(max(C, key=lambda x: x[0]))  
 # x:x[]字母可以随意修改，求最大值方式按照中括号[]里面的维度，[0]按照第一维，[1]按照第二维。
         values.sort(key=lambda x: x[0], reverse=True)
-        action = values[0][1]
+        action = values[0][1] # ?????
         action.append(self.symbol)
         return action
 
@@ -360,11 +369,23 @@ def play():
         else:
             print("It is a tie!")
 
+def test_reverse():
+    test = [1,2,3,4,5]
+    le = len(test)
+    for i in reversed(range(le - 1)):
+    # for i in reversed(range(4)):
+        print("i:", i, " i+1:", i+1)
+
 # self.estimations states 都是hash为key的，棋盘上的每一种状态对应一种hash
 # self.data是0-8
 if __name__ == '__main__':
     #1e5 is a number expressed using scientific notation and it means 10 to the 5th power (the e meaning 'exponent')
     #so 1e5 is equal to 100000, both notations are interchangeably meaning the same.
-    train(int(1e5))
-    compete(int(1e3))
+    train(int(1e2))
+    compete(int(1e1))
     play()
+
+    # test_reverse()
+    # while True:
+    #     print("")
+
