@@ -44,6 +44,7 @@ class Task:
 
         # it is not clear how to set the reward, I use a unit normal distribution here
         # reward is determined by (s, a, s')
+        # fjc The numpy.random.randn() function creates an array of specified shape and fills it with random values as per standard normal distribution. 
         self.reward = np.random.randn(n_states, len(ACTIONS), b)
 
     def step(self, state, action):

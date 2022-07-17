@@ -26,6 +26,21 @@ logger.addHandler(file_handler)
 with open('logs.log', 'w'):
     pass
 
+# 这里始终是一个多臂老虎机，没有涉及到多个老虎机,否则就是contextual bandits的问题
+# Associative search tasks are often now called contextual bandits in the literature. Associative
+# search tasks are intermediate between the k-armed bandit problem and the full reinforcement learning
+# problem. They are like the full reinforcement learning problem in that they involve learning a policy,
+# but like our version of the k-armed bandit problem in that each action affects only the immediate
+# reward. If actions are allowed to affect the next situation as well as the reward, then we have the
+# full reinforcement learning problem
+# All the methods formed their action-value estimates using the sampleaverage technique. The upper graph shows the increase in expected reward with experience. The greedy
+# method improved slightly faster than the other methods at the very beginning, but then leveled off at
+# a lower level.
+
+# Average performance of ε-greedy action-value methods on the 10-armed testbed. These data are
+# averages over 2000 runs with different bandit problems. All methods used sample averages as their action-value
+# estimates.
+
 class Bandit:
     # @k_arm: # of arms
     # @epsilon: probability for exploration in epsilon-greedy algorithm
@@ -52,10 +67,9 @@ class Bandit:
 
     def reset(self):
         # real reward for each action
-        self.q_true = np.random.randn(self.k) + self.true_reward
-        logger.info("self.q_true:")
+        # self.q_true = np.random.randn(self.k) + self.true_reward # 
         # self.q_true = np.array([0,-1,5,0.5])
-        self.q_true = np.array([0,-1,1,0.5]) + self.true_reward
+        self.q_true = np.array([0,-1,1,0.5]) + self.true_reward # 我固定一下q_true,方便看,因为k-arm是4，所以这里
         logger.info(self.q_true)
         logger.info("self.q_true end")
         # estimation for each action
@@ -72,38 +86,69 @@ class Bandit:
 
     # get an action for this bandit
     def act(self):
-        if np.random.rand() < self.epsilon:
+        if np.random.rand() < self.epsilon:# explore
             rnd = np.random.choice(self.indices)
             return rnd, rnd
+# 2.7 Upper-Confidence-Bound Action Selection, UCB_param是用来和q_estimation的值进行权重分配的
 
+# The idea of this upper confidence bound (UCB) action selection is that the square-root term is a
+# measure of the uncertainty or variance in the estimate of a’s value. The quantity being max’ed over is
+# thus a sort of upper bound on the possible true value of action a, with c determining the confidence level.
+# Each time a is selected the uncertainty is presumably reduced: Nt(a) increments, and, as it appears in
+# the denominator, the uncertainty term decreases. 
+# On the other hand, each time an action other than a
+# is selected, t increases but Nt(a) does not; because t appears in the numerator, the uncertainty estimate
+# increases. The use of the natural logarithm means that the increases get smaller over time, but are
+# unbounded; all actions will eventually be selected, but actions with lower value estimates, or that have
+# already been selected frequently, will be selected with decreasing frequency over time
+  
+# UCB is more difficult than ε-greedy to extend beyond bandits to the more general
+# reinforcement learning settings
         if self.UCB_param is not None:
             UCB_estimation = self.q_estimation + \
-                self.UCB_param * np.sqrt(np.log(self.time + 1) / (self.action_count + 1e-5))
+                self.UCB_param * np.sqrt(np.log(self.time + 1) / (self.action_count + 1e-5)) # log参数不能为0，所以+1
             q_best = np.max(UCB_estimation)
             return np.random.choice(np.where(UCB_estimation == q_best)[0]), None
-
+# 2.8 Gradient Bandit Algorithms
         if self.gradient:
             exp_est = np.exp(self.q_estimation)
-            self.action_prob = exp_est / np.sum(exp_est)
+            self.action_prob = exp_est / np.sum(exp_est) # 当前在动作价值中的比例
             return np.random.choice(self.indices, p=self.action_prob), None
 
         # res = 0
         # res_fjc = 0
         # if fjc:
         q_best_fjc = np.max(self.q_estimation_fjc)
-        tmp_fjc = np.where(self.q_estimation_fjc == q_best_fjc)[0]
+        tmp_fjc = np.where(self.q_estimation_fjc == q_best_fjc)[0] # 已经取第一个了，再随机是啥意思，bug?
         act_fjc = np.random.choice(tmp_fjc)
         # else:
+        #用法一
+#当self.net_input(X)返回的值大于等于0.0时，where返回1，否则返回0
+# np.where(self.net_input(X) >= 0.0, 1, 0)
+# #用法二
+# a = np.array([2,4,6,8,10])
+# #只有一个参数表示条件的时候
+# np.where(a > 5)
+# 输出：
+# array([ 6,  8, 10])
+
+#取价值最大的动作,q_estimation就是action-value函数
         q_best = np.max(self.q_estimation)
-        tmp = np.where(self.q_estimation == q_best)[0]
-        act = np.random.choice(tmp)
+        # tt = np.where(self.q_estimation == q_best)
+#         tt_: (array([3], dtype=int64),)
+# ttt+: [3]
+        # print("tt_:", tt)
+        # ttt = np.where(self.q_estimation == q_best)[0]
+        # print("ttt+:", ttt)
+        tmp = np.where(self.q_estimation == q_best)[0] # 满足条件的数组
+        act = np.random.choice(tmp) # 从满足条件的数组中随机选一个
         return act, act_fjc
 
     # take an action, update estimation for this action
     def step(self, action, fjc = False):
         # generate the reward under N(real reward, 1)
         reward = np.random.randn() + self.q_true[action]
-        self.all_reward[action] += reward
+        self.all_reward[action] += reward # 所有历史奖励
         self.time += 1
         self.action_count[action] += 1
         self.average_reward += (reward - self.average_reward) / self.time
@@ -115,14 +160,14 @@ class Bandit:
             else:
                 # Incremental Implementation
                 self.q_estimation[action] += (reward - self.q_estimation[action]) / self.action_count[action]
-        elif self.gradient:
-            one_hot = np.zeros(self.k)
+        elif self.gradient:# 基于随机梯度上升
+            one_hot = np.zeros(self.k) # self.k对应老虎机数量
             one_hot[action] = 1
             if self.gradient_baseline:
                 baseline = self.average_reward
             else:
                 baseline = 0
-            self.q_estimation += self.step_size * (reward - baseline) * (one_hot - self.action_prob)
+            self.q_estimation += self.step_size * (reward - baseline) * (one_hot - self.action_prob)#???????
         else:
             # update estimation with constant step size
             # self.q_estimation[action] += self.step_size * (reward - self.q_estimation[action])
@@ -147,12 +192,12 @@ class Bandit:
 
 
 def simulate(runs, time, bandits, fjc = False):
-    rewards = np.zeros((len(bandits), runs, time))
+    rewards = np.zeros((len(bandits), runs, time)) # 三维的0数组, len(bandits)老虎机数量
     rewards_fjc = np.zeros((len(bandits), runs, time))
     best_action_counts = np.zeros(rewards.shape)
     best_action_counts_fjc = np.zeros(rewards_fjc.shape)
-    for i, bandit in enumerate(bandits):
-        for r in trange(runs):
+    for i, bandit in enumerate(bandits):# 每个老虎机
+        for r in trange(runs):# 
             bandit.reset()
             for t in range(time):
                 action,action_fjc = bandit.act()
@@ -181,7 +226,11 @@ def simulate(runs, time, bandits, fjc = False):
 
 def figure_2_1():
     plt.subplot(2, 1, 1)
-    data = np.random.randn(200, 10) + np.random.randn(10)
+    # 输出10+1个标准正太分布，200是元素个数，10是分布的个数,即一共10个正太分布，用violinplot显示在一张图上
+    data = np.random.randn(200, 10) + np.random.randn(10) # 输出200行，10列的数组+1行10列的数组
+    # These plots include a marker for the median of the data and a box indicating the interquartile range, as in the standard box plots.
+    #  Overlaid on this box plot is a kernel density estimation. 
+    #  Like box plots, violin plots are used to represent comparison of a variable distribution (or sample distribution) across different "categories"
     plt.violinplot(dataset=data)
     print("dateset")
     plt.xlabel("Action")
@@ -189,15 +238,16 @@ def figure_2_1():
     plt.legend()
 
     plt.subplot(2, 1, 2)
-    data = np.random.randn(200, 5)
+    data = np.random.randn(2, 5)
     plt.violinplot(dataset=data)
     plt.legend()
 
     plt.savefig('../images/figure_2_1.png')
     plt.close()
 
-
-def figure_2_2(runs=100, time=1000):
+# 采用的方法是计算平均值的方式，但弊端是我们需要记录每次的reward (i.e. 下图方法1)，导致占用内存空间。
+# def figure_2_2(runs=100, time=1000):
+def figure_2_2(runs=10, time=100):
     # epsilons = [0, 0.1, 0.01]
     epsilons = [0.1]
     bandits = [Bandit(epsilon=eps, sample_averages=True) for eps in epsilons]
@@ -247,7 +297,7 @@ def figure_2_2(runs=100, time=1000):
     plt.savefig('../images/figure_2_2.png')
     plt.close()
 
-#initial   ????
+#2.6 Optimistic Initial Values
 def figure_2_3(runs=20, time=100):
     bandits = []
     bandits.append(Bandit(epsilon=0, initial=5, step_size=0.1)) # 有initial为啥收敛更快????
@@ -263,10 +313,10 @@ def figure_2_3(runs=20, time=100):
     plt.savefig('../images/figure_2_3.png')
     plt.close()
 
-# ucb      ????
+# ucb    
 def figure_2_4(runs=2000, time=1000):
     bandits = []
-    bandits.append(Bandit(epsilon=0, UCB_param=2, sample_averages=True)) # ucb到底是怎么回事?????
+    bandits.append(Bandit(epsilon=0, UCB_param=2, sample_averages=True))
     bandits.append(Bandit(epsilon=0.1, sample_averages=True))
     _, average_rewards = simulate(runs, time, bandits)
 
@@ -279,7 +329,11 @@ def figure_2_4(runs=2000, time=1000):
     plt.savefig('../images/figure_2_4.png')
     plt.close()
 
-# gradient
+# 2.8 Gradient Bandit Algorithms
+# Exercise 2.7
+# There is a natural learning algorithm for this setting based on the idea of stochastic gradient ascent.
+# On each step, after selecting action At and receiving the reward Rt, preferences are updated by:
+#  公式2.10
 # def figure_2_5(runs=2000, time=1000):
 def figure_2_5(runs=20, time=100):
     bandits = []
@@ -318,7 +372,8 @@ def figure_2_6(runs=20, time=100):
     bandits = []
     for generator, parameter in zip(generators, parameters):
         for param in parameter:
-            bandit = generator(pow(2, param))
+            vv = pow(2, param)
+            bandit = generator(vv)
             bandits.append(bandit)
 
     _, average_rewards = simulate(runs, time, bandits)
@@ -336,6 +391,11 @@ def figure_2_6(runs=20, time=100):
     plt.savefig('../images/figure_2_6.png')
     plt.close()
 
+def testWhere():
+    arr = [6,4,6,2,5] 
+    best = np.max(arr) # 6
+    tmp = np.where(arr == best)  
+    print("testWhere tmp:", tmp) # [0,2]
 
 if __name__ == '__main__':
     # figure_2_1()
@@ -344,3 +404,15 @@ if __name__ == '__main__':
     # figure_2_4()
     # figure_2_5()
     figure_2_6()
+
+    # testWhere()
+
+# >>>np.random.choice(5)#从[0, 5)中随机输出一个随机数
+# #相当于np.random.randint(0, 5)
+# 	2
+
+# >>>np.random.choice(5, 3)#在[0, 5)内输出五个数字并组成一维数组（ndarray）
+# #相当于np.random.randint(0, 5, 3)
+# 	array([1, 4, 1])
+
+# 参考 https://www.bbsmax.com/A/LPdoq6vyJ3/

@@ -5,7 +5,7 @@
 # Permission given to modify the code as long as you keep this        #
 # declaration at the top                                              #
 #######################################################################
-
+# Example 3.6: Gridworld
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,6 +25,11 @@ matplotlib.use('Agg')
 # logger.addHandler(file_handler)
 # with open('logs.log', 'w'):
 #     pass
+
+# Actions that would take the agent off the grid leave its location
+# unchanged, but also result in a reward of −1. Other actions result in a reward of 0, except those that
+# move the agent out of the special states A and B. From state A, all four actions yield a reward of +10
+# and take the agent to A0 . From state B, all actions yield a reward of +5 and take the agent to B0 .
 
 WORLD_SIZE = 5
 A_POS = [0, 1]
@@ -97,25 +102,31 @@ def draw_image(image):
 def draw_policy(optimal_values):
     fig, ax = plt.subplots()
     ax.set_axis_off()
-    tb = Table(ax, bbox=[0, 0, 1, 1])
+#     locstr, optional
+# The position of the cell with respect to ax. This must be one of the codes.
 
-    nrows, ncols = optimal_values.shape
-    width, height = 1.0 / ncols, 1.0 / nrows
+# bboxBbox, optional
+# A bounding box to draw the table into. If this is not None, this overrides loc.
+    tb = Table(ax, bbox=[0, 0, 1, 1]) #?????
+
+    nrows, ncols = optimal_values.shape # 5,5
+    width, height = 1.0 / ncols, 1.0 / nrows # 0.2,0.2
 
     # Add cells
-    for (i, j), val in np.ndenumerate(optimal_values):
+    for (i, j), val in np.ndenumerate(optimal_values):# 遍历optimal_values矩阵的索引和值 # ndenumerate 见文档下面注释
         next_vals=[]
         for action in ACTIONS:
             next_state, _ = step([i, j], action)
-            next_vals.append(optimal_values[next_state[0],next_state[1]])
+            optimalv = optimal_values[next_state[0],next_state[1]]
+            next_vals.append(optimalv) # 上下左右四个方向的格子的值
 
         max_vals = np.max(next_vals)
-        bool_arr = (next_vals == max_vals)
-        new_vals = np.where(bool_arr)
-        best_actions=new_vals[0]
+        bool_arr = (next_vals == max_vals) #假如最大值在第3,4个， 则bool_arr为[false,false,true,true]
+        new_vals = np.where(bool_arr) # 0:array(2,3),所有为true的值的集合
+        best_actions=new_vals[0]# 取第一个，array([2,3],)
         val=''
         for ba in best_actions:
-            val+=ACTIONS_FIGS[ba]
+            val+=ACTIONS_FIGS[ba] # 取出方向，方便绘图，如果有多个，就组合 "→↓"
 
         # add state labels
         if [i, j] == A_POS:
@@ -216,3 +227,25 @@ if __name__ == '__main__':
     figure_3_2_linear_system()
     figure_3_2()
     figure_3_5()
+
+
+# np.ndenumerate
+# a = np.array([[1, 2], [3, 4]])
+# for index, x in np.ndenumerate(a):
+#     print(index, x)
+# (0, 0) 1
+# (0, 1) 2
+# (1, 0) 3
+# (1, 1) 4
+ 
+# >>> arr = np.array([[3,6,6],[4,5,1]])
+# >>> np.ravel_multi_index(arr, (7,6))
+# array([22, 41, 37], dtype=int64)
+
+# 代码分析：
+# 该代码默认以“行”优先。在7x6的数组中，取其中（3，6）、（6，5）、（6，1）位置对应的索引数组中的索引值，如下图：
+
+# 由上图可以得到以下规律：
+# [3, 4] ——> 3 * 6 + 4 = 22
+# [6, 1] ——> 6 * 6 + 5 = 41
+# [6, 5] ——> 6 * 6 + 1 = 37
