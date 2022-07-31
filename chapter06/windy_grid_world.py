@@ -11,6 +11,10 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+import sys
+sys.path.append( '../common/mylog' )
+from log import logger
+
 # world height
 WORLD_HEIGHT = 7
 
@@ -60,11 +64,14 @@ def episode(q_value):
     # initialize state
     state = START
 
+    logger.info("q_value.shape:", q_value.shape)
     # choose an action based on epsilon-greedy algorithm
     if np.random.binomial(1, EPSILON) == 1:
         action = np.random.choice(ACTIONS)
     else:
-        values_ = q_value[state[0], state[1], :]
+        logger.info("q_value:%s",q_value)
+        values_ = q_value[state[0], state[1], :] # 由于state=[3,0], 取出来类似[-1.6875 -1.6875 -1.625  -1.5   ]
+        logger.info("values_:%s",values_)
         action = np.random.choice([action_ for action_, value_ in enumerate(values_) if value_ == np.max(values_)])
 
     # keep going until get to the goal state
@@ -87,7 +94,7 @@ def episode(q_value):
 
 def figure_6_3():
     q_value = np.zeros((WORLD_HEIGHT, WORLD_WIDTH, 4))
-    episode_limit = 500
+    episode_limit = 5; # 500
 
     steps = []
     ep = 0
