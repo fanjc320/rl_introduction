@@ -1,10 +1,15 @@
 # Reinforcement Learning: An Introduction
 
+```diff
+@@ I am looking for self-motivated students interested in RL at different levels! @@
+@@ Visit https://shangtongzhang.github.io/people/ for more details. @@
+```
+
 [![Build Status](https://travis-ci.org/ShangtongZhang/reinforcement-learning-an-introduction.svg?branch=master)](https://travis-ci.org/ShangtongZhang/reinforcement-learning-an-introduction)
 
-Python code for Sutton & Barto's book [*Reinforcement Learning: An Introduction (2nd Edition)*](http://incompleteideas.net/book/the-book-2nd.html)
+Python replication for Sutton & Barto's book [*Reinforcement Learning: An Introduction (2nd Edition)*](http://incompleteideas.net/book/the-book-2nd.html)
 
-> If you have any confusion about the code or want to report a bug, please open an issue instead of emailing me directly.
+> If you have any confusion about the code or want to report a bug, please open an issue instead of emailing me directly, and unfortunately I do not have exercise answers for the book.
 
 # Contents 
 
@@ -100,7 +105,3 @@ python any_file_you_want.py
 
 # Contribution
 If you want to contribute some missing examples or fix some bugs, feel free to open an issue or make a pull request. 
-
-Following are missing figures/examples:
-
-* Figure 12.14: The effect of λ 
